@@ -19,20 +19,21 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd python-tool
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r python-tool/requirements.txt
           pip install pyinstaller
       
       - name: Build Windows EXE
         run: |
           cd python-tool
-          pyinstaller --name="OTA凭证工具" --windowed --onefile --clean ota_credential_tool.py
+          pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
+        shell: cmd
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OTA凭证工具-Windows
-          path: python-tool/dist/OTA凭证工具.exe
+          name: OTA-Credential-Tool-Windows
+          path: python-tool/dist/OTACredentialTool.exe
 
   build-macos:
     runs-on: macos-latest
@@ -46,20 +47,20 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd python-tool
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r python-tool/requirements.txt
           pip install pyinstaller
       
       - name: Build macOS APP
         run: |
           cd python-tool
-          pyinstaller --name="OTA凭证工具" --windowed --onefile --clean ota_credential_tool.py
+          pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OTA凭证工具-macOS
-          path: python-tool/dist/OTA凭证工具.app
+          name: OTA-Credential-Tool-macOS
+          path: python-tool/dist/OTACredentialTool.app
 
   build-linux:
     runs-on: ubuntu-latest
@@ -73,17 +74,17 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd python-tool
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r python-tool/requirements.txt
           pip install pyinstaller
       
       - name: Build Linux binary
         run: |
           cd python-tool
-          pyinstaller --name="OTA凭证工具" --onefile --clean ota_credential_tool.py
+          pyinstaller --name=OTACredentialTool --onefile --clean ota_credential_tool.py
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OTA凭证工具-Linux
-          path: python-tool/dist/OTA凭证工具
+          name: OTA-Credential-Tool-Linux
+          path: python-tool/dist/OTACredentialTool
