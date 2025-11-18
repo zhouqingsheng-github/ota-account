@@ -1,0 +1,89 @@
+name: Build OTA Tool
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd python-tool
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build Windows EXE
+        run: |
+          cd python-tool
+          pyinstaller --name="OTA凭证工具" --windowed --onefile --clean ota_credential_tool.py
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: OTA凭证工具-Windows
+          path: python-tool/dist/OTA凭证工具.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd python-tool
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build macOS APP
+        run: |
+          cd python-tool
+          pyinstaller --name="OTA凭证工具" --windowed --onefile --clean ota_credential_tool.py
+      
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: OTA凭证工具-macOS
+          path: python-tool/dist/OTA凭证工具.app
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd python-tool
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build Linux binary
+        run: |
+          cd python-tool
+          pyinstaller --name="OTA凭证工具" --onefile --clean ota_credential_tool.py
+      
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: OTA凭证工具-Linux
+          path: python-tool/dist/OTA凭证工具
