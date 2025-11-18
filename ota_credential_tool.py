@@ -30,30 +30,79 @@ class BrowserInstallWorker(QThread):
     def run(self):
         """执行浏览器安装"""
         try:
-            self.progress.emit("正在安装Chromium浏览器...")
+            self.progress.emit("开始安装Chromium浏览器...")
+            self.progress.emit("大小约150MB，请耐心等待...")
             
-            # 执行 playwright install chromium
-            process = subprocess.Popen(
-                [sys.executable, "-m", "playwright", "install", "chromium"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-            
-            # 实时读取输出
-            for line in process.stdout:
-                self.progress.emit(line.strip())
-            
-            process.wait()
-            
-            if process.returncode == 0:
-                self.finished.emit(True, "浏览器安装成功！")
-            else:
-                self.finished.emit(False, "浏览器安装失败")
+            # 使用playwright的Python API直接安装，不依赖命令行
+            # 这样在打包后的exe中也能正常工作
+            try:
+                from playwright._impl._driver import compute_driver_executable, get_driver_env
+                import asyncio
+                
+                self.progress.emit("正在下载浏览器...")
+                
+                # 获取playwright驱动路径
+                driver_executable = compute_driver_executable()
+                env = get_driver_env()
+                
+                # 执行安装命令
+                process = subprocess.Popen(
+                    [str(driver_executable), "install", "chromium"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env=env
+                )
+                
+                output_lines = []
+                # 实时读取输出
+                for line in process.stdout:
+                    line = line.strip()
+                    if line:
+                        output_lines.append(line)
+                        # 显示最后3行
+                        display_text = "\n".join(output_lines[-3:])
+                        self.progress.emit(display_text)
+                
+                process.wait()
+                
+                if process.returncode == 0:
+                    self.finished.emit(True, "✅ 浏览器安装成功！")
+                else:
+                    error_msg = "\n".join(output_lines[-10:]) if output_lines else "未知错误"
+                    self.finished.emit(False, f"浏览器安装失败\n\n错误信息:\n{error_msg}")
+                    
+            except ImportError:
+                # 如果无法导入playwright内部模块，回退到命令行方式
+                self.progress.emit("使用备用安装方式...")
+                
+                process = subprocess.Popen(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output_lines = []
+                for line in process.stdout:
+                    line = line.strip()
+                    if line:
+                        output_lines.append(line)
+                        display_text = "\n".join(output_lines[-3:])
+                        self.progress.emit(display_text)
+                
+                process.wait()
+                
+                if process.returncode == 0:
+                    self.finished.emit(True, "✅ 浏览器安装成功！")
+                else:
+                    error_msg = "\n".join(output_lines[-10:]) if output_lines else "未知错误"
+                    self.finished.emit(False, f"浏览器安装失败\n\n错误信息:\n{error_msg}")
                 
         except Exception as e:
-            self.finished.emit(False, f"安装出错: {str(e)}")
+            self.finished.emit(False, f"安装出错: {str(e)}\n\n请确保网络连接正常")
 
 
 class LoginWorker(QThread):
@@ -656,11 +705,17 @@ class OTACredentialTool(QMainWindow):
         """安装浏览器"""
         # 创建进度对话框
         self.progress_dialog = QProgressDialog("正在安装浏览器，请稍候...", None, 0, 0, self)
-        self.progress_dialog.setWindowTitle("安装中")
+        self.progress_dialog.setWindowTitle("安装Playwright浏览器")
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self.progress_dialog.setMinimumDuration(0)
-        self.progress_dialog.setFixedSize(350, 100)  # 固定大小
+        self.progress_dialog.setMinimumSize(500, 150)  # 增大尺寸显示更多信息
         self.progress_dialog.setCancelButton(None)  # 禁用取消按钮
+        self.progress_dialog.setStyleSheet("""
+            QProgressDialog {
+                font-family: "Consolas", "Monaco", monospace;
+                font-size: 11px;
+            }
+        """)
         self.progress_dialog.show()
         
         # 创建安装工作线程
@@ -672,14 +727,11 @@ class OTACredentialTool(QMainWindow):
     def on_install_progress(self, message: str):
         """安装进度更新"""
         if self.progress_dialog and message:
-            # 只显示关键信息，过滤掉过长的输出
-            if "Downloading" in message or "下载" in message:
-                self.progress_dialog.setLabelText("正在下载浏览器...")
-            elif "Installing" in message or "安装" in message:
-                self.progress_dialog.setLabelText("正在安装浏览器...")
-            elif "%" in message:
-                # 显示百分比进度
-                self.progress_dialog.setLabelText(f"正在下载: {message}")
+            # 显示所有输出信息
+            message = message.strip()
+            if message:
+                # 更新进度对话框文本
+                self.progress_dialog.setLabelText(f"安装中...\n\n{message}")
     
     def on_install_finished(self, success: bool, message: str):
         """安装完成"""

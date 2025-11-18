@@ -15,29 +15,37 @@ playwright install chromium
 
 ## 打包步骤
 
-### macOS 打包
+### 方式1: 不包含浏览器（推荐，文件小）
 
 ```bash
-# 方式1: 使用打包脚本（推荐）
 python build.py
-
-# 方式2: 手动打包
-pyinstaller --name="OTA凭证工具" --windowed --onefile --clean ota_credential_tool.py
 ```
 
-打包完成后，应用程序位于：`dist/OTA凭证工具.app`
+- 文件大小: 约50-80MB
+- 首次运行需要下载浏览器（150MB）
+- 适合网络分发
+
+### 方式2: 包含浏览器（开箱即用）
+
+```bash
+# 先安装浏览器
+playwright install chromium
+
+# 打包（包含浏览器）
+python build_with_browser.py
+```
+
+- 文件大小: 约200-250MB
+- 无需额外下载，开箱即用
+- 适合离线环境
+
+### macOS 打包
+
+打包完成后，应用程序位于：`dist/OTACredentialTool.app`
 
 ### Windows 打包
 
-```bash
-# 方式1: 使用打包脚本
-python build.py
-
-# 方式2: 手动打包
-pyinstaller --name="OTA凭证工具" --windowed --onefile --clean --icon=icon.ico ota_credential_tool.py
-```
-
-打包完成后，应用程序位于：`dist/OTA凭证工具.exe`
+打包完成后，应用程序位于：`dist/OTACredentialTool.exe`
 
 ### Linux 打包
 
