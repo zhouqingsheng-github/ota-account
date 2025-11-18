@@ -3,7 +3,7 @@ name: Build OTA Tool
 on:
   push:
     tags:
-      - 'main'
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -26,11 +26,11 @@ jobs:
       
       - name: Build Windows EXE
         run: |
-          cd ota-account
+          cd python-tool
           pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: OTA-Credential-Tool-Windows
-          path: ota-account/dist/OTACredentialTool.exe
+          path: python-tool/dist/OTACredentialTool.exe
