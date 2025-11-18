@@ -4,7 +4,7 @@
 
 ### 1. 安装依赖
 ```bash
-cd python-tool
+cd ota-account
 pip install -r requirements.txt
 ```
 

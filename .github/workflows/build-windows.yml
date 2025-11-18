@@ -19,28 +19,26 @@ jobs:
           python-version: "3.11"
       
       - name: Install dependencies
-        working-directory: ota-account
         run: |
+          cd python-tool
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
       
       - name: Install Playwright browsers
-        working-directory: ota-account
-        run: playwright install chromium
+        run: |
+          cd python-tool
+          playwright install chromium
       
       - name: Get browser path and build
-        working-directory: ota-account
         run: |
-          # 获取浏览器根目录
+          cd python-tool
           $browserRoot = python -c "from pathlib import Path; from playwright.sync_api import sync_playwright; p = sync_playwright().start(); exe_path = Path(p.chromium.executable_path); browsers_dir = exe_path.parent.parent.parent; print(str(browsers_dir)); p.stop()"
           Write-Host "Browsers directory: $browserRoot"
-          
-          # 打包（包含整个浏览器目录）
           pyinstaller --onefile --windowed --name=OTACredentialTool --add-data="$browserRoot;playwright/driver/package/.local-browsers" --collect-all playwright ota_credential_tool.py
       
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: OTA-Credential-Tool-WithBrowser
-          path: ota-account/dist/OTACredentialTool.exe
+          path: python-tool/dist/OTACredentialTool.exe
