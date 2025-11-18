@@ -18,16 +18,15 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
+        working-directory: python-tool
         run: |
           python -m pip install --upgrade pip
-          pip install -r python-tool/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
       
       - name: Build Windows EXE
-        run: |
-          cd python-tool
-          pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
-        shell: cmd
+        working-directory: python-tool
+        run: pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -46,15 +45,15 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
+        working-directory: python-tool
         run: |
           python -m pip install --upgrade pip
-          pip install -r python-tool/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
       
       - name: Build macOS APP
-        run: |
-          cd python-tool
-          pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
+        working-directory: python-tool
+        run: pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -73,15 +72,15 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
+        working-directory: python-tool
         run: |
           python -m pip install --upgrade pip
-          pip install -r python-tool/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
       
       - name: Build Linux binary
-        run: |
-          cd python-tool
-          pyinstaller --name=OTACredentialTool --onefile --clean ota_credential_tool.py
+        working-directory: python-tool
+        run: pyinstaller --name=OTACredentialTool --onefile --clean ota_credential_tool.py
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
