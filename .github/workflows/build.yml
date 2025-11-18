@@ -3,7 +3,7 @@ name: Build OTA Tool
 on:
   push:
     tags:
-      - 'v*'
+      - 'main'
   workflow_dispatch:
 
 jobs:
