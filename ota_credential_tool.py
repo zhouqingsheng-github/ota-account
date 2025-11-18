@@ -340,10 +340,64 @@ class OTACredentialTool(QMainWindow):
     def init_ui(self):
         """初始化UI"""
         self.setWindowTitle("OTA凭证获取工具")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(850, 650)
+        
+        # 设置全局样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5f5f5;
+            }
+            QWidget {
+                font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            }
+            QLabel {
+                color: #333;
+            }
+            QLineEdit {
+                padding: 8px 12px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background-color: white;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #1890ff;
+                outline: none;
+            }
+            QComboBox {
+                padding: 8px 12px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background-color: white;
+                font-size: 14px;
+            }
+            QComboBox:focus {
+                border-color: #1890ff;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #666;
+                margin-right: 10px;
+            }
+            QTextEdit {
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background-color: white;
+                padding: 10px;
+                font-family: "Consolas", "Monaco", monospace;
+                font-size: 12px;
+            }
+        """)
         
         # 中央部件
         central_widget = QWidget()
+        central_widget.setStyleSheet("background-color: white;")
         self.setCentralWidget(central_widget)
         
         # 主布局
@@ -353,92 +407,179 @@ class OTACredentialTool(QMainWindow):
         
         # 标题
         title = QLabel("OTA平台凭证获取工具")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        title.setStyleSheet("""
+            font-size: 22px; 
+            font-weight: bold; 
+            color: #1890ff;
+            padding: 20px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #e6f7ff, stop:1 #bae7ff);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
+        
+        # 表单区域
+        form_widget = QWidget()
+        form_widget.setStyleSheet("""
+            QWidget {
+                background-color: #fafafa;
+                border-radius: 8px;
+                padding: 15px;
+            }
+        """)
+        form_layout = QVBoxLayout(form_widget)
         
         # 平台选择
         platform_layout = QHBoxLayout()
         platform_label = QLabel("OTA渠道:")
         platform_label.setFixedWidth(80)
+        platform_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.platform_combo = QComboBox()
         self.platform_combo.addItems(["美团", "飞猪", "携程"])
         platform_layout.addWidget(platform_label)
         platform_layout.addWidget(self.platform_combo)
-        layout.addLayout(platform_layout)
+        form_layout.addLayout(platform_layout)
         
         # 账号输入
         username_layout = QHBoxLayout()
         username_label = QLabel("账号:")
         username_label.setFixedWidth(80)
+        username_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("请输入账号")
         username_layout.addWidget(username_label)
         username_layout.addWidget(self.username_input)
-        layout.addLayout(username_layout)
+        form_layout.addLayout(username_layout)
         
         # 密码输入
         password_layout = QHBoxLayout()
         password_label = QLabel("密码:")
         password_label.setFixedWidth(80)
+        password_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("请输入密码")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         password_layout.addWidget(password_label)
         password_layout.addWidget(self.password_input)
-        layout.addLayout(password_layout)
+        form_layout.addLayout(password_layout)
+        
+        layout.addWidget(form_widget)
         
         # 获取凭证按钮
-        self.get_credential_btn = QPushButton("获取凭证")
+        self.get_credential_btn = QPushButton("🔑 获取凭证")
         self.get_credential_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1890ff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1890ff, stop:1 #096dd9);
                 color: white;
                 border: none;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 6px;
+                margin: 10px 0;
             }
             QPushButton:hover {
-                background-color: #40a9ff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #40a9ff, stop:1 #1890ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #096dd9, stop:1 #0050b3);
             }
             QPushButton:disabled {
                 background-color: #d9d9d9;
+                color: #999;
             }
         """)
         self.get_credential_btn.clicked.connect(self.get_credential)
         layout.addWidget(self.get_credential_btn)
         
         # 凭证显示区域
-        credential_label = QLabel("凭证内容:")
+        credential_label = QLabel("📋 凭证内容:")
+        credential_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 10px;")
         layout.addWidget(credential_label)
         
         self.credential_text = QTextEdit()
         self.credential_text.setReadOnly(True)
         self.credential_text.setPlaceholderText("凭证将在这里显示...")
+        self.credential_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f6f8fa;
+                border: 2px solid #e1e4e8;
+                border-radius: 6px;
+                padding: 12px;
+                font-family: "Consolas", "Monaco", "Courier New", monospace;
+                font-size: 12px;
+                line-height: 1.5;
+            }
+        """)
         layout.addWidget(self.credential_text)
         
         # 复制按钮
-        self.copy_btn = QPushButton("复制凭证")
+        self.copy_btn = QPushButton("📄 复制凭证")
         self.copy_btn.setEnabled(False)
         self.copy_btn.setStyleSheet("""
             QPushButton {
-                background-color: #52c41a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #52c41a, stop:1 #389e0d);
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 10px;
                 font-size: 14px;
-                border-radius: 4px;
+                font-weight: bold;
+                border-radius: 6px;
             }
             QPushButton:hover {
-                background-color: #73d13d;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #73d13d, stop:1 #52c41a);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #389e0d, stop:1 #237804);
             }
             QPushButton:disabled {
                 background-color: #d9d9d9;
+                color: #999;
             }
         """)
         self.copy_btn.clicked.connect(self.copy_credential)
         layout.addWidget(self.copy_btn)
+        
+        # 浏览器路径显示
+        browser_info_layout = QHBoxLayout()
+        browser_label = QLabel("浏览器路径:")
+        browser_label.setStyleSheet("color: #666; font-size: 12px;")
+        self.browser_path_label = QLabel("检测中...")
+        self.browser_path_label.setStyleSheet("color: #999; font-size: 12px;")
+        self.browser_path_label.setWordWrap(True)
+        browser_info_layout.addWidget(browser_label)
+        browser_info_layout.addWidget(self.browser_path_label, 1)
+        layout.addLayout(browser_info_layout)
+        
+        # 异步检测浏览器路径
+        self.detect_browser_path()
+    
+    def detect_browser_path(self):
+        """检测并显示浏览器路径"""
+        try:
+            with sync_playwright() as p:
+                try:
+                    browser_path = p.chromium.executable_path
+                    if os.path.exists(browser_path):
+                        self.browser_path_label.setText(browser_path)
+                        self.browser_path_label.setStyleSheet("color: #52c41a; font-size: 12px;")
+                    else:
+                        self.browser_path_label.setText("未安装")
+                        self.browser_path_label.setStyleSheet("color: #ff4d4f; font-size: 12px;")
+                except Exception:
+                    self.browser_path_label.setText("未安装")
+                    self.browser_path_label.setStyleSheet("color: #ff4d4f; font-size: 12px;")
+        except Exception as e:
+            self.browser_path_label.setText(f"检测失败: {str(e)}")
+            self.browser_path_label.setStyleSheet("color: #faad14; font-size: 12px;")
     
 
     
@@ -517,30 +658,49 @@ class OTACredentialTool(QMainWindow):
         self.worker.start()
     
     def check_browser_installed(self) -> bool:
-        """检查浏览器是否已安装，返回True表示已安装或用户选择安装"""
+        """检查浏览器是否已安装，返回True表示已安装"""
         try:
+            # 尝试启动playwright检查浏览器
             with sync_playwright() as p:
-                browser_path = p.chromium.executable_path
-                if os.path.exists(browser_path):
-                    return True
-                raise FileNotFoundError("浏览器不存在")
-        except Exception as e:
-            error_msg = str(e)
-            if "Executable doesn't exist" in error_msg or "Looks like Playwright" in error_msg:
-                reply = QMessageBox.question(
-                    self,
-                    "浏览器未安装",
-                    "检测到Playwright浏览器未安装，是否现在安装？\n\n"
-                    "安装大约需要下载150MB，请确保网络连接正常。",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
+                # 尝试获取浏览器可执行文件路径
+                try:
+                    browser_path = p.chromium.executable_path
+                    # 检查文件是否真实存在
+                    if os.path.exists(browser_path):
+                        return True
+                except Exception:
+                    pass
                 
-                if reply == QMessageBox.StandardButton.Yes:
-                    self.install_browser()
-                    return False  # 正在安装，本次不执行登录
-                else:
-                    return False  # 用户取消
-            return True  # 其他错误，假设浏览器存在
+                # 如果上面失败，尝试实际启动浏览器测试
+                try:
+                    test_browser = p.chromium.launch(headless=True)
+                    test_browser.close()
+                    return True
+                except Exception as launch_error:
+                    # 浏览器启动失败，说明未安装
+                    if "Executable doesn't exist" in str(launch_error) or "Looks like Playwright" in str(launch_error):
+                        reply = QMessageBox.question(
+                            self,
+                            "浏览器未安装",
+                            "检测到Playwright浏览器未安装，是否现在安装？\n\n"
+                            "安装大约需要下载150MB，请确保网络连接正常。",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        )
+                        
+                        if reply == QMessageBox.StandardButton.Yes:
+                            self.install_browser()
+                            return False  # 正在安装，本次不执行登录
+                        else:
+                            return False  # 用户取消
+                    else:
+                        # 其他错误，可能是浏览器已安装但有其他问题
+                        return True
+        except Exception as e:
+            # 如果连playwright都无法导入，说明环境有问题
+            QMessageBox.critical(self, "错误", f"Playwright初始化失败: {str(e)}")
+            return False
+        
+        return True
     
     def on_browser_missing(self):
         """浏览器缺失处理"""
