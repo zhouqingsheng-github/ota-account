@@ -22,20 +22,17 @@ jobs:
           cache: 'pip'  # 缓存 pip 依赖，加快构建速度
       
       - name: Install dependencies
-        working-directory: ota-account
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
       
       - name: Install Playwright browsers
-        working-directory: ota-account
         run: |
           playwright install chromium
           Write-Host "✅ Playwright 浏览器安装完成"
       
       - name: Build with browser (使用打包脚本)
-        working-directory: ota-account
         run: |
           Write-Host "=========================================="
           Write-Host "开始打包（包含浏览器）"
@@ -43,7 +40,6 @@ jobs:
           python build_with_browser.py
       
       - name: Check build result
-        working-directory: ota-account
         run: |
           if (Test-Path "dist/OTACredentialTool.exe") {
             $size = (Get-Item "dist/OTACredentialTool.exe").Length / 1MB
@@ -62,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OTA-Credential-Tool-Windows-${{ github.sha }}
-          path: ota-account/dist/OTACredentialTool.exe
+          path: dist/OTACredentialTool.exe
           retention-days: 30  # 保留 30 天
       
       - name: Create Release (如果是 tag)
