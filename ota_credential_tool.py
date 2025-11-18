@@ -334,6 +334,7 @@ class OTACredentialTool(QMainWindow):
         self.install_worker: Optional[BrowserInstallWorker] = None
         self.progress_dialog: Optional[QProgressDialog] = None
         self.browser_checked = False  # 标记是否已检查过浏览器
+        self.browser_installed = False  # 标记浏览器是否已安装
         self.init_ui()
         # 不在启动时检查，改为点击获取凭证时检查
     
@@ -366,10 +367,14 @@ class OTACredentialTool(QMainWindow):
             }
             QComboBox {
                 padding: 8px 12px;
-                border: 1px solid #d9d9d9;
+                border: 2px solid #d9d9d9;
                 border-radius: 4px;
                 background-color: white;
+                color: #000;
                 font-size: 14px;
+            }
+            QComboBox:hover {
+                border-color: #40a9ff;
             }
             QComboBox:focus {
                 border-color: #1890ff;
@@ -377,13 +382,36 @@ class OTACredentialTool(QMainWindow):
             QComboBox::drop-down {
                 border: none;
                 width: 30px;
+                background: transparent;
             }
             QComboBox::down-arrow {
                 image: none;
                 border-left: 5px solid transparent;
                 border-right: 5px solid transparent;
-                border-top: 5px solid #666;
+                border-top: 5px solid #333;
                 margin-right: 10px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: #000;
+                border: 2px solid #1890ff;
+                selection-background-color: #1890ff;
+                selection-color: white;
+                outline: none;
+                padding: 5px;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 10px 15px;
+                color: #000;
+                min-height: 30px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #e6f7ff;
+                color: #000;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #1890ff;
+                color: white;
             }
             QTextEdit {
                 border: 1px solid #d9d9d9;
@@ -422,22 +450,25 @@ class OTACredentialTool(QMainWindow):
         
         # 表单区域
         form_widget = QWidget()
+        form_widget.setObjectName("formWidget")
         form_widget.setStyleSheet("""
-            QWidget {
+            #formWidget {
                 background-color: #fafafa;
                 border-radius: 8px;
                 padding: 15px;
             }
         """)
         form_layout = QVBoxLayout(form_widget)
+        form_layout.setSpacing(15)
         
         # 平台选择
         platform_layout = QHBoxLayout()
         platform_label = QLabel("OTA渠道:")
-        platform_label.setFixedWidth(80)
-        platform_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        platform_label.setFixedWidth(100)
+        platform_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
         self.platform_combo = QComboBox()
         self.platform_combo.addItems(["美团", "飞猪", "携程"])
+        self.platform_combo.setMinimumHeight(40)
         platform_layout.addWidget(platform_label)
         platform_layout.addWidget(self.platform_combo)
         form_layout.addLayout(platform_layout)
@@ -445,10 +476,11 @@ class OTACredentialTool(QMainWindow):
         # 账号输入
         username_layout = QHBoxLayout()
         username_label = QLabel("账号:")
-        username_label.setFixedWidth(80)
-        username_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        username_label.setFixedWidth(100)
+        username_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("请输入账号")
+        self.username_input.setMinimumHeight(40)
         username_layout.addWidget(username_label)
         username_layout.addWidget(self.username_input)
         form_layout.addLayout(username_layout)
@@ -456,11 +488,12 @@ class OTACredentialTool(QMainWindow):
         # 密码输入
         password_layout = QHBoxLayout()
         password_label = QLabel("密码:")
-        password_label.setFixedWidth(80)
-        password_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        password_label.setFixedWidth(100)
+        password_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("请输入密码")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setMinimumHeight(40)
         password_layout.addWidget(password_label)
         password_layout.addWidget(self.password_input)
         form_layout.addLayout(password_layout)
@@ -550,11 +583,15 @@ class OTACredentialTool(QMainWindow):
         
         # 浏览器路径显示
         browser_info_layout = QHBoxLayout()
-        browser_label = QLabel("浏览器路径:")
-        browser_label.setStyleSheet("color: #666; font-size: 12px;")
+        browser_label = QLabel("浏览器状态:")
+        browser_label.setStyleSheet("color: #666; font-size: 12px; font-weight: bold;")
+        
         self.browser_path_label = QLabel("检测中...")
         self.browser_path_label.setStyleSheet("color: #999; font-size: 12px;")
         self.browser_path_label.setWordWrap(True)
+        self.browser_path_label.setCursor(Qt.CursorShape.PointingHandCursor)  # 鼠标悬停显示手型
+        self.browser_path_label.mousePressEvent = self.on_browser_label_clicked
+        
         browser_info_layout.addWidget(browser_label)
         browser_info_layout.addWidget(self.browser_path_label, 1)
         layout.addLayout(browser_info_layout)
@@ -569,17 +606,49 @@ class OTACredentialTool(QMainWindow):
                 try:
                     browser_path = p.chromium.executable_path
                     if os.path.exists(browser_path):
-                        self.browser_path_label.setText(browser_path)
-                        self.browser_path_label.setStyleSheet("color: #52c41a; font-size: 12px;")
+                        self.browser_path_label.setText(f"✅ 已安装: {browser_path}")
+                        self.browser_path_label.setStyleSheet(
+                            "color: #52c41a; font-size: 11px; padding: 5px; "
+                            "background-color: #f6ffed; border-radius: 4px;"
+                        )
+                        self.browser_path_label.setCursor(Qt.CursorShape.ArrowCursor)
+                        self.browser_installed = True
                     else:
-                        self.browser_path_label.setText("未安装")
-                        self.browser_path_label.setStyleSheet("color: #ff4d4f; font-size: 12px;")
+                        self.show_not_installed()
                 except Exception:
-                    self.browser_path_label.setText("未安装")
-                    self.browser_path_label.setStyleSheet("color: #ff4d4f; font-size: 12px;")
+                    self.show_not_installed()
         except Exception as e:
-            self.browser_path_label.setText(f"检测失败: {str(e)}")
-            self.browser_path_label.setStyleSheet("color: #faad14; font-size: 12px;")
+            self.browser_path_label.setText(f"❌ 检测失败: {str(e)}")
+            self.browser_path_label.setStyleSheet(
+                "color: #faad14; font-size: 11px; padding: 5px; "
+                "background-color: #fffbe6; border-radius: 4px;"
+            )
+            self.browser_installed = False
+    
+    def show_not_installed(self):
+        """显示未安装状态"""
+        self.browser_path_label.setText("❌ 未安装 (点击此处安装)")
+        self.browser_path_label.setStyleSheet(
+            "color: #ff4d4f; font-size: 12px; font-weight: bold; "
+            "padding: 5px; background-color: #fff1f0; border-radius: 4px; "
+            "text-decoration: underline;"
+        )
+        self.browser_path_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.browser_installed = False
+    
+    def on_browser_label_clicked(self, event):
+        """点击浏览器标签时的处理"""
+        if not self.browser_installed:
+            reply = QMessageBox.question(
+                self,
+                "安装浏览器",
+                "是否现在安装Playwright浏览器？\n\n"
+                "安装大约需要下载150MB，请确保网络连接正常。",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.install_browser()
     
 
     
@@ -620,7 +689,9 @@ class OTACredentialTool(QMainWindow):
         
         if success:
             self.browser_checked = False  # 重置标记，下次点击时会重新检查
-            QMessageBox.information(self, "成功", f"{message}\n\n现在可以点击\"获取凭证\"按钮了。")
+            # 重新检测浏览器路径
+            self.detect_browser_path()
+            QMessageBox.information(self, "成功", f"{message}\n\n浏览器已安装完成，现在可以使用了！")
         else:
             QMessageBox.critical(self, "错误", message)
     
