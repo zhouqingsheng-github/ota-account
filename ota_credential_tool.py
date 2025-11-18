@@ -19,96 +19,9 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Error
 
 
-class BrowserInstallWorker(QThread):
-    """浏览器安装工作线程"""
-    finished = pyqtSignal(bool, str)  # 成功/失败, 消息
-    progress = pyqtSignal(str)  # 进度信息
-    
-    def __init__(self):
-        super().__init__()
-    
-    def run(self):
-        """执行浏览器安装"""
-        try:
-            self.progress.emit("开始安装Chromium浏览器...")
-            self.progress.emit("大小约150MB，请耐心等待...")
-            
-            # 使用playwright的Python API直接安装，不依赖命令行
-            # 这样在打包后的exe中也能正常工作
-            try:
-                from playwright._impl._driver import compute_driver_executable, get_driver_env
-                import asyncio
-                
-                self.progress.emit("正在下载浏览器...")
-                
-                # 获取playwright驱动路径
-                driver_executable = compute_driver_executable()
-                env = get_driver_env()
-                
-                # 执行安装命令
-                process = subprocess.Popen(
-                    [str(driver_executable), "install", "chromium"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    env=env
-                )
-                
-                output_lines = []
-                # 实时读取输出
-                for line in process.stdout:
-                    line = line.strip()
-                    if line:
-                        output_lines.append(line)
-                        # 显示最后3行
-                        display_text = "\n".join(output_lines[-3:])
-                        self.progress.emit(display_text)
-                
-                process.wait()
-                
-                if process.returncode == 0:
-                    self.finished.emit(True, "✅ 浏览器安装成功！")
-                else:
-                    error_msg = "\n".join(output_lines[-10:]) if output_lines else "未知错误"
-                    self.finished.emit(False, f"浏览器安装失败\n\n错误信息:\n{error_msg}")
-                    
-            except ImportError:
-                # 如果无法导入playwright内部模块，回退到命令行方式
-                self.progress.emit("使用备用安装方式...")
-                
-                process = subprocess.Popen(
-                    [sys.executable, "-m", "playwright", "install", "chromium"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
-                
-                output_lines = []
-                for line in process.stdout:
-                    line = line.strip()
-                    if line:
-                        output_lines.append(line)
-                        display_text = "\n".join(output_lines[-3:])
-                        self.progress.emit(display_text)
-                
-                process.wait()
-                
-                if process.returncode == 0:
-                    self.finished.emit(True, "✅ 浏览器安装成功！")
-                else:
-                    error_msg = "\n".join(output_lines[-10:]) if output_lines else "未知错误"
-                    self.finished.emit(False, f"浏览器安装失败\n\n错误信息:\n{error_msg}")
-                
-        except Exception as e:
-            self.finished.emit(False, f"安装出错: {str(e)}\n\n请确保网络连接正常")
-
-
 class LoginWorker(QThread):
     """登录工作线程"""
     finished = pyqtSignal(bool, str)  # 成功/失败, 凭证/错误信息
-    browser_missing = pyqtSignal()  # 浏览器缺失信号
     
     def __init__(self, platform: str, username: str, password: str):
         super().__init__()
@@ -121,12 +34,6 @@ class LoginWorker(QThread):
         try:
             credential = self.login()
             self.finished.emit(True, credential)
-        except Error as e:
-            # 检查是否是浏览器缺失错误
-            if "Executable doesn't exist" in str(e) or "Looks like Playwright was just installed" in str(e):
-                self.browser_missing.emit()
-            else:
-                self.finished.emit(False, str(e))
         except Exception as e:
             self.finished.emit(False, str(e))
     
@@ -380,12 +287,7 @@ class OTACredentialTool(QMainWindow):
     def __init__(self):
         super().__init__()
         self.worker: Optional[LoginWorker] = None
-        self.install_worker: Optional[BrowserInstallWorker] = None
-        self.progress_dialog: Optional[QProgressDialog] = None
-        self.browser_checked = False  # 标记是否已检查过浏览器
-        self.browser_installed = False  # 标记浏览器是否已安装
         self.init_ui()
-        # 不在启动时检查，改为点击获取凭证时检查
     
     def init_ui(self):
         """初始化UI"""
@@ -630,23 +532,11 @@ class OTACredentialTool(QMainWindow):
         self.copy_btn.clicked.connect(self.copy_credential)
         layout.addWidget(self.copy_btn)
         
-        # 浏览器路径显示
-        browser_info_layout = QHBoxLayout()
-        browser_label = QLabel("浏览器状态:")
-        browser_label.setStyleSheet("color: #666; font-size: 12px; font-weight: bold;")
-        
-        self.browser_path_label = QLabel("检测中...")
-        self.browser_path_label.setStyleSheet("color: #999; font-size: 12px;")
-        self.browser_path_label.setWordWrap(True)
-        self.browser_path_label.setCursor(Qt.CursorShape.PointingHandCursor)  # 鼠标悬停显示手型
-        self.browser_path_label.mousePressEvent = self.on_browser_label_clicked
-        
-        browser_info_layout.addWidget(browser_label)
-        browser_info_layout.addWidget(self.browser_path_label, 1)
-        layout.addLayout(browser_info_layout)
-        
-        # 异步检测浏览器路径
-        self.detect_browser_path()
+        # 版本信息
+        version_label = QLabel("v1.0.0 - 内嵌浏览器版本")
+        version_label.setStyleSheet("color: #999; font-size: 11px; text-align: center;")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(version_label)
     
     def detect_browser_path(self):
         """检测并显示浏览器路径"""
@@ -762,12 +652,6 @@ class OTACredentialTool(QMainWindow):
             QMessageBox.warning(self, "警告", "请输入密码")
             return
         
-        # 首次使用时检查浏览器
-        if not self.browser_checked:
-            self.browser_checked = True
-            if not self.check_browser_installed():
-                return  # 用户取消安装，不继续
-        
         # 禁用按钮
         self.get_credential_btn.setEnabled(False)
         self.get_credential_btn.setText("登录中...")
@@ -777,53 +661,7 @@ class OTACredentialTool(QMainWindow):
         # 创建工作线程
         self.worker = LoginWorker(platform, username, password)
         self.worker.finished.connect(self.on_login_finished)
-        self.worker.browser_missing.connect(self.on_browser_missing)
         self.worker.start()
-    
-    def check_browser_installed(self) -> bool:
-        """检查浏览器是否已安装，返回True表示已安装"""
-        try:
-            # 尝试启动playwright检查浏览器
-            with sync_playwright() as p:
-                # 尝试获取浏览器可执行文件路径
-                try:
-                    browser_path = p.chromium.executable_path
-                    # 检查文件是否真实存在
-                    if os.path.exists(browser_path):
-                        return True
-                except Exception:
-                    pass
-                
-                # 如果上面失败，尝试实际启动浏览器测试
-                try:
-                    test_browser = p.chromium.launch(headless=True)
-                    test_browser.close()
-                    return True
-                except Exception as launch_error:
-                    # 浏览器启动失败，说明未安装
-                    if "Executable doesn't exist" in str(launch_error) or "Looks like Playwright" in str(launch_error):
-                        reply = QMessageBox.question(
-                            self,
-                            "浏览器未安装",
-                            "检测到Playwright浏览器未安装，是否现在安装？\n\n"
-                            "安装大约需要下载150MB，请确保网络连接正常。",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                        )
-                        
-                        if reply == QMessageBox.StandardButton.Yes:
-                            self.install_browser()
-                            return False  # 正在安装，本次不执行登录
-                        else:
-                            return False  # 用户取消
-                    else:
-                        # 其他错误，可能是浏览器已安装但有其他问题
-                        return True
-        except Exception as e:
-            # 如果连playwright都无法导入，说明环境有问题
-            QMessageBox.critical(self, "错误", f"Playwright初始化失败: {str(e)}")
-            return False
-        
-        return True
     
     def on_browser_missing(self):
         """浏览器缺失处理"""
