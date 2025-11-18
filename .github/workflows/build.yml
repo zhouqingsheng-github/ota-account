@@ -9,6 +9,10 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ./python-tool
+    
     steps:
       - uses: actions/checkout@v4
       
@@ -25,12 +29,10 @@ jobs:
           pip install PyQt6==6.7.1
       
       - name: Build Windows EXE
-        run: |
-          cd ota-account
-          pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
+        run: pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: OTA-Credential-Tool-Windows
-          path: ota-account/dist/OTACredentialTool.exe
+          path: ./python-tool/dist/OTACredentialTool.exe
