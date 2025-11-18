@@ -20,6 +20,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: 'pip'  # 缓存 pip 依赖，加快构建速度
+        env:
+          PYTHONIOENCODING: utf-8  # 设置 Python 输出编码为 UTF-8
       
       - name: Install dependencies
         run: |

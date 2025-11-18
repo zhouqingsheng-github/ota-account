@@ -10,6 +10,12 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# 设置 UTF-8 编码，避免 Windows 下的编码问题
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 def clean():
     """清理旧的打包文件"""
     print("清理旧文件...")
