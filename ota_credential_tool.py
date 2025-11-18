@@ -333,8 +333,9 @@ class OTACredentialTool(QMainWindow):
         self.worker: Optional[LoginWorker] = None
         self.install_worker: Optional[BrowserInstallWorker] = None
         self.progress_dialog: Optional[QProgressDialog] = None
+        self.browser_checked = False  # 标记是否已检查过浏览器
         self.init_ui()
-        self.check_browser_on_startup()
+        # 不在启动时检查，改为点击获取凭证时检查
     
     def init_ui(self):
         """初始化UI"""
@@ -439,27 +440,7 @@ class OTACredentialTool(QMainWindow):
         self.copy_btn.clicked.connect(self.copy_credential)
         layout.addWidget(self.copy_btn)
     
-    def check_browser_on_startup(self):
-        """启动时检查浏览器是否已安装"""
-        try:
-            # 尝试检测浏览器
-            with sync_playwright() as p:
-                # 尝试获取浏览器路径
-                browser_path = p.chromium.executable_path
-                if not os.path.exists(browser_path):
-                    raise FileNotFoundError("浏览器不存在")
-        except Exception:
-            # 浏览器未安装，提示用户
-            reply = QMessageBox.question(
-                self,
-                "浏览器未安装",
-                "检测到Playwright浏览器未安装，是否现在安装？\n\n"
-                "安装大约需要下载150MB，请确保网络连接正常。",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                self.install_browser()
+
     
     def install_browser(self):
         """安装浏览器"""
@@ -497,7 +478,8 @@ class OTACredentialTool(QMainWindow):
             self.progress_dialog = None
         
         if success:
-            QMessageBox.information(self, "成功", message)
+            self.browser_checked = False  # 重置标记，下次点击时会重新检查
+            QMessageBox.information(self, "成功", f"{message}\n\n现在可以点击\"获取凭证\"按钮了。")
         else:
             QMessageBox.critical(self, "错误", message)
     
@@ -516,6 +498,12 @@ class OTACredentialTool(QMainWindow):
             QMessageBox.warning(self, "警告", "请输入密码")
             return
         
+        # 首次使用时检查浏览器
+        if not self.browser_checked:
+            self.browser_checked = True
+            if not self.check_browser_installed():
+                return  # 用户取消安装，不继续
+        
         # 禁用按钮
         self.get_credential_btn.setEnabled(False)
         self.get_credential_btn.setText("登录中...")
@@ -527,6 +515,32 @@ class OTACredentialTool(QMainWindow):
         self.worker.finished.connect(self.on_login_finished)
         self.worker.browser_missing.connect(self.on_browser_missing)
         self.worker.start()
+    
+    def check_browser_installed(self) -> bool:
+        """检查浏览器是否已安装，返回True表示已安装或用户选择安装"""
+        try:
+            with sync_playwright() as p:
+                browser_path = p.chromium.executable_path
+                if os.path.exists(browser_path):
+                    return True
+                raise FileNotFoundError("浏览器不存在")
+        except Exception as e:
+            error_msg = str(e)
+            if "Executable doesn't exist" in error_msg or "Looks like Playwright" in error_msg:
+                reply = QMessageBox.question(
+                    self,
+                    "浏览器未安装",
+                    "检测到Playwright浏览器未安装，是否现在安装？\n\n"
+                    "安装大约需要下载150MB，请确保网络连接正常。",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.install_browser()
+                    return False  # 正在安装，本次不执行登录
+                else:
+                    return False  # 用户取消
+            return True  # 其他错误，假设浏览器存在
     
     def on_browser_missing(self):
         """浏览器缺失处理"""
