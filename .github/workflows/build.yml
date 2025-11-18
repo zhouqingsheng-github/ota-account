@@ -26,11 +26,11 @@ jobs:
       
       - name: Build Windows EXE
         run: |
-          cd python-tool
+          cd ota-account
           pyinstaller --name=OTACredentialTool --windowed --onefile --clean ota_credential_tool.py
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: OTA-Credential-Tool-Windows
-          path: python-tool/dist/OTACredentialTool.exe
+          path: ota-account/dist/OTACredentialTool.exe
