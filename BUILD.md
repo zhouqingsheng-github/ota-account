@@ -1,5 +1,20 @@
 # 打包说明
 
+## ⚠️ 重要提示
+
+**打包后的 exe 无法执行 `playwright install chromium`！**
+
+原因：
+- 客户端没有 Python 环境
+- exe 是只读的，无法写入文件
+- 必须在打包前把浏览器打包进去
+
+**给客户分发时，请使用"方式2: 包含浏览器"！**
+
+详细说明请查看 [FAQ.md](FAQ.md)
+
+---
+
 ## 环境准备
 
 ### 1. 安装依赖
@@ -8,153 +23,175 @@ cd ota-account
 pip install -r requirements.txt
 ```
 
-### 2. 安装Playwright浏览器（可选）
+### 2. 安装Playwright浏览器（必须！）
 ```bash
 playwright install chromium
 ```
 
 ## 打包步骤
 
-### 方式1: 不包含浏览器（推荐，文件小）
+### 方式1: 不包含浏览器（仅供开发测试）
 
 ```bash
 python build.py
 ```
 
 - 文件大小: 约50-80MB
-- 首次运行需要下载浏览器（150MB）
-- 适合网络分发
+- ❌ **不适合给客户**
+- ❌ 客户运行时会报错
+- ✅ 仅用于开发快速测试
 
-### 方式2: 包含浏览器（开箱即用）
+### 方式2: 包含浏览器（推荐给客户）⭐
 
 ```bash
-# 先安装浏览器
+# 1. 先安装浏览器（如果还没安装）
 playwright install chromium
 
-# 打包（包含浏览器）
+# 2. 打包（会自动包含浏览器）
 python build_with_browser.py
 ```
 
 - 文件大小: 约200-250MB
-- 无需额外下载，开箱即用
-- 适合离线环境
+- ✅ **推荐给客户使用**
+- ✅ 开箱即用，无需安装
+- ✅ 无需 Python 环境
+- ✅ 无需网络连接
 
-### macOS 打包
-
-打包完成后，应用程序位于：`dist/OTACredentialTool.app`
-
-### Windows 打包
-
-打包完成后，应用程序位于：`dist/OTACredentialTool.exe`
-
-### Linux 打包
-
-```bash
-# 使用打包脚本
-python build.py
-
-# 或手动打包
-pyinstaller --name="OTA凭证工具" --onefile --clean ota_credential_tool.py
-```
-
-打包完成后，应用程序位于：`dist/OTA凭证工具`
-
-## 打包参数说明
-
-- `--name`: 应用程序名称
-- `--windowed`: 不显示控制台窗口（仅GUI）
-- `--onefile`: 打包成单个文件
-- `--clean`: 清理临时文件
-- `--noconfirm`: 不询问确认
-- `--icon`: 指定应用图标（可选）
-
-## 分发说明
-
-### macOS
-1. 直接复制 `dist/OTA凭证工具.app` 给用户
-2. 用户双击运行即可
-3. 首次运行会提示安装浏览器（约150MB）
+## 打包后的文件位置
 
 ### Windows
-1. 直接复制 `dist/OTA凭证工具.exe` 给用户
-2. 用户双击运行即可
-3. 首次运行会提示安装浏览器（约150MB）
+```
+dist/OTACredentialTool.exe
+```
+
+### macOS
+```
+dist/OTACredentialTool.app
+```
 
 ### Linux
-1. 复制 `dist/OTA凭证工具` 给用户
-2. 添加执行权限：`chmod +x OTA凭证工具`
-3. 运行：`./OTA凭证工具`
+```
+dist/OTACredentialTool
+```
 
-## 注意事项
+## 分发给客户
 
-1. **浏览器安装**：打包后的程序不包含Playwright浏览器，首次运行时会自动提示安装
-2. **文件大小**：打包后的程序约50-100MB（不含浏览器）
-3. **系统兼容性**：
-   - macOS: 10.13+
-   - Windows: 7/8/10/11
-   - Linux: 主流发行版
-4. **网络要求**：首次运行需要联网下载浏览器
+### 推荐流程
+
+1. **打包完整版本**：
+```bash
+python build_with_browser.py
+```
+
+2. **测试**：
+- 在干净的虚拟机上测试
+- 确保没有 Python 环境
+- 确保能正常运行
+
+3. **分发**：
+- 直接发送 exe/app 文件
+- 或上传到云存储提供下载链接
+
+### 使用说明（给客户）
+
+**Windows**：
+1. 双击 `OTACredentialTool.exe`
+2. 选择平台、输入账号密码
+3. 点击"获取凭证"
+
+**macOS**：
+1. 双击 `OTACredentialTool.app`
+2. 如果提示"无法打开"，运行：
+```bash
+xattr -cr OTACredentialTool.app
+```
+3. 再次双击运行
+
+**Linux**：
+1. 添加执行权限：
+```bash
+chmod +x OTACredentialTool
+```
+2. 运行：
+```bash
+./OTACredentialTool
+```
 
 ## 故障排查
 
 ### 问题1: 打包失败
+
 ```bash
-# 重新安装 PyInstaller
-pip uninstall pyinstaller
-pip install pyinstaller
+# 重新安装依赖
+pip uninstall pyinstaller playwright
+pip install pyinstaller playwright
+
+# 重新安装浏览器
+playwright install chromium
+
+# 重新打包
+python build_with_browser.py
 ```
 
-### 问题2: 运行时缺少模块
+### 问题2: 打包后提示"浏览器缺失"
+
+**原因**：使用了 `build.py` 而不是 `build_with_browser.py`
+
+**解决**：
 ```bash
-# 检查依赖是否完整
-pip install -r requirements.txt
+python build_with_browser.py
 ```
 
-### 问题3: macOS 提示"无法打开"
-```bash
-# 允许运行未签名的应用
-xattr -cr "dist/OTA凭证工具.app"
-```
+### 问题3: 客户运行时报错
 
-### 问题4: Windows 杀毒软件误报
-- 将程序添加到杀毒软件白名单
-- 或使用代码签名证书签名程序
+**检查清单**：
+- ✅ 是否使用 `build_with_browser.py` 打包？
+- ✅ 打包前是否安装了浏览器？
+- ✅ 打包日志是否显示浏览器路径？
+- ✅ 文件大小是否约 200-250MB？
+
+如果文件只有 50-80MB，说明没有包含浏览器！
 
 ## 高级选项
 
 ### 添加应用图标
 
 1. 准备图标文件：
-   - macOS: `icon.icns`
    - Windows: `icon.ico`
-   - Linux: `icon.png`
+   - macOS: `icon.icns`
 
-2. 打包时指定图标：
-```bash
-pyinstaller --name="OTA凭证工具" --windowed --onefile --icon=icon.ico ota_credential_tool.py
-```
-
-### 减小文件大小
-
-```bash
-# 使用 UPX 压缩
-pyinstaller --name="OTA凭证工具" --windowed --onefile --upx-dir=/path/to/upx ota_credential_tool.py
-```
-
-### 包含额外文件
-
-创建 `ota_credential_tool.spec` 文件，添加：
+2. 修改打包脚本，添加：
 ```python
-datas=[('config.json', '.'), ('assets', 'assets')]
+'--icon=icon.ico',
 ```
 
-## 自动化打包
+### 使用 UPX 压缩
 
-可以使用 GitHub Actions 或其他CI/CD工具自动打包多平台版本。
+可以减少 20-30% 文件大小：
+
+```bash
+# 安装 UPX
+# macOS
+brew install upx
+
+# Windows
+# 从 https://upx.github.io/ 下载
+
+# 打包时使用
+pyinstaller --upx-dir=/path/to/upx ...
+```
 
 ## 技术支持
 
-如有问题，请检查：
-1. Python版本：3.8+
-2. PyInstaller版本：6.0+
-3. 依赖包是否完整安装
+遇到问题？查看：
+1. [FAQ.md](FAQ.md) - 常见问题解答
+2. [BROWSER_PACKAGING.md](BROWSER_PACKAGING.md) - 浏览器打包详解
+
+## 总结
+
+**记住这些要点**：
+1. ❌ 打包后的 exe **不能**自动下载浏览器
+2. ✅ 必须使用 `build_with_browser.py` 打包
+3. ✅ 打包前必须先安装浏览器
+4. ✅ 给客户的版本必须包含浏览器
+5. ✅ 文件大小应该是 200-250MB（包含浏览器）

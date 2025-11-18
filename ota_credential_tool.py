@@ -10,6 +10,16 @@ import json
 import subprocess
 import os
 from typing import Optional
+from pathlib import Path
+
+# 设置 Playwright 浏览器路径（用于打包后的程序）
+if getattr(sys, 'frozen', False):
+    # 如果是打包后的程序
+    bundle_dir = Path(sys._MEIPASS)
+    browser_dir = bundle_dir / 'playwright' / 'driver' / 'package' / '.local-browsers'
+    if browser_dir.exists():
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(browser_dir)
+        print(f"使用打包的浏览器: {browser_dir}")
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QTextEdit, QMessageBox,
@@ -578,64 +588,46 @@ class OTACredentialTool(QMainWindow):
     def on_browser_label_clicked(self, event):
         """点击浏览器标签时的处理"""
         if not self.browser_installed:
+            self.show_browser_missing_error()
+    
+
+    
+    def show_browser_missing_error(self):
+        """显示浏览器缺失错误"""
+        if getattr(sys, 'frozen', False):
+            # 打包后的程序
+            QMessageBox.critical(
+                self,
+                "浏览器缺失",
+                "此程序缺少必要的浏览器组件！\n\n"
+                "请下载包含浏览器的完整版本，或联系技术支持。\n\n"
+                "注意：打包后的程序无法自动下载浏览器。"
+            )
+        else:
+            # 开发环境
             reply = QMessageBox.question(
                 self,
-                "安装浏览器",
-                "是否现在安装Playwright浏览器？\n\n"
-                "安装大约需要下载150MB，请确保网络连接正常。",
+                "浏览器未安装",
+                "检测到 Playwright 浏览器未安装。\n\n"
+                "是否现在安装？（需要 Python 环境）",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                self.install_browser()
+                self.install_browser_dev()
     
-
-    
-    def install_browser(self):
-        """安装浏览器"""
-        # 创建进度对话框
-        self.progress_dialog = QProgressDialog("正在安装浏览器，请稍候...", None, 0, 0, self)
-        self.progress_dialog.setWindowTitle("安装Playwright浏览器")
-        self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        self.progress_dialog.setMinimumDuration(0)
-        self.progress_dialog.setMinimumSize(500, 150)  # 增大尺寸显示更多信息
-        self.progress_dialog.setCancelButton(None)  # 禁用取消按钮
-        self.progress_dialog.setStyleSheet("""
-            QProgressDialog {
-                font-family: "Consolas", "Monaco", monospace;
-                font-size: 11px;
-            }
-        """)
-        self.progress_dialog.show()
-        
-        # 创建安装工作线程
-        self.install_worker = BrowserInstallWorker()
-        self.install_worker.progress.connect(self.on_install_progress)
-        self.install_worker.finished.connect(self.on_install_finished)
-        self.install_worker.start()
-    
-    def on_install_progress(self, message: str):
-        """安装进度更新"""
-        if self.progress_dialog and message:
-            # 显示所有输出信息
-            message = message.strip()
-            if message:
-                # 更新进度对话框文本
-                self.progress_dialog.setLabelText(f"安装中...\n\n{message}")
-    
-    def on_install_finished(self, success: bool, message: str):
-        """安装完成"""
-        if self.progress_dialog:
-            self.progress_dialog.close()
-            self.progress_dialog = None
-        
-        if success:
-            self.browser_checked = False  # 重置标记，下次点击时会重新检查
-            # 重新检测浏览器路径
-            self.detect_browser_path()
-            QMessageBox.information(self, "成功", f"{message}\n\n浏览器已安装完成，现在可以使用了！")
-        else:
-            QMessageBox.critical(self, "错误", message)
+    def install_browser_dev(self):
+        """开发环境下安装浏览器"""
+        try:
+            QMessageBox.information(
+                self,
+                "安装浏览器",
+                "请在终端运行以下命令安装浏览器：\n\n"
+                "playwright install chromium\n\n"
+                "安装完成后重启程序。"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"安装失败: {str(e)}")
     
     def get_credential(self):
         """获取凭证"""
@@ -667,17 +659,7 @@ class OTACredentialTool(QMainWindow):
         """浏览器缺失处理"""
         self.get_credential_btn.setEnabled(True)
         self.get_credential_btn.setText("获取凭证")
-        
-        reply = QMessageBox.question(
-            self,
-            "浏览器未安装",
-            "检测到Playwright浏览器未安装，是否现在安装？\n\n"
-            "安装大约需要下载150MB，请确保网络连接正常。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            self.install_browser()
+        self.show_browser_missing_error()
     
     def on_login_finished(self, success: bool, result: str):
         """登录完成回调"""

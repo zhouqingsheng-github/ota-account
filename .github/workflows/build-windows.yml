@@ -2,12 +2,14 @@ name: Build Windows EXE
 
 on:
   push:
-    branches: [ main ]  # 推送到 main 分支时自动执行
+    branches: [ main, master ]  # 推送到 main/master 分支时自动执行
   workflow_dispatch:     # 支持手动触发
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   build-windows:
-    runs-on: windows-latest  # 直接用 GitHub 提供的 Windows 虚拟机
+    runs-on: windows-latest
     
     steps:
       - name: Checkout code
@@ -17,6 +19,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: 'pip'  # 缓存 pip 依赖，加快构建速度
       
       - name: Install dependencies
         run: |
@@ -27,15 +30,43 @@ jobs:
       - name: Install Playwright browsers
         run: |
           playwright install chromium
+          Write-Host "✅ Playwright 浏览器安装完成"
       
-      - name: Get browser path and build
+      - name: Build with browser (使用打包脚本)
         run: |
-          $browserRoot = python -c "from pathlib import Path; from playwright.sync_api import sync_playwright; p = sync_playwright().start(); exe_path = Path(p.chromium.executable_path); browsers_dir = exe_path.parent.parent.parent; print(str(browsers_dir)); p.stop()"
-          Write-Host "Browsers directory: $browserRoot"
-          pyinstaller --onefile --windowed --name=OTACredentialTool --add-data="$browserRoot;playwright/driver/package/.local-browsers" --collect-all playwright ota_credential_tool.py
+          Write-Host "=========================================="
+          Write-Host "开始打包（包含浏览器）"
+          Write-Host "=========================================="
+          python build_with_browser.py
+      
+      - name: Check build result
+        run: |
+          if (Test-Path "dist/OTACredentialTool.exe") {
+            $size = (Get-Item "dist/OTACredentialTool.exe").Length / 1MB
+            Write-Host ""
+            Write-Host "=========================================="
+            Write-Host "✅ 打包成功！"
+            Write-Host "文件: dist/OTACredentialTool.exe"
+            Write-Host "大小: $([math]::Round($size, 2)) MB"
+            Write-Host "=========================================="
+          } else {
+            Write-Host "❌ 打包失败：找不到 exe 文件"
+            exit 1
+          }
       
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OTA-Credential-Tool-WithBrowser
+          name: OTA-Credential-Tool-Windows-${{ github.sha }}
           path: dist/OTACredentialTool.exe
+          retention-days: 30  # 保留 30 天
+      
+      - name: Create Release (如果是 tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/OTACredentialTool.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
