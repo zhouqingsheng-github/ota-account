@@ -50,42 +50,124 @@ class LoginWorker(QThread):
     def login(self) -> str:
         """执行登录并获取凭证"""
         with sync_playwright() as p:
-            # 启动浏览器，添加参数避免被检测
-            browser = p.chromium.launch(
-                headless=False,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-dev-shm-usage',
-                    '--no-sandbox'
-                ]
-            )
+            # 尝试使用系统 Chrome，失败则使用 Chromium
+            try:
+                browser = p.chromium.launch(
+                    headless=False,
+                    channel='chrome',  # 使用系统安装的 Chrome
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                        '--disable-web-security',
+                        '--disable-features=IsolateOrigins,site-per-process',
+                        '--disable-site-isolation-trials'
+                    ]
+                )
+            except Exception:
+                # 如果没有 Chrome，使用 Chromium
+                browser = p.chromium.launch(
+                    headless=False,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                        '--disable-web-security',
+                        '--disable-features=IsolateOrigins,site-per-process',
+                        '--disable-site-isolation-trials'
+                    ]
+                )
             
             # 创建上下文，模拟真实浏览器
             context = browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 locale='zh-CN',
-                timezone_id='Asia/Shanghai'
+                timezone_id='Asia/Shanghai',
+                permissions=['geolocation'],
+                has_touch=False,
+                is_mobile=False,
+                device_scale_factor=1
             )
             
             page = context.new_page()
             
-            # 隐藏webdriver特征
+            # 增强的反检测脚本
             page.add_init_script("""
+                // 移除 webdriver 标识
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
                 
+                // 添加 chrome 对象
                 window.navigator.chrome = {
-                    runtime: {}
+                    runtime: {},
+                    loadTimes: function() {},
+                    csi: function() {},
+                    app: {}
                 };
                 
+                // 修改 plugins
                 Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5]
+                    get: () => [
+                        {
+                            0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
+                            description: "Portable Document Format",
+                            filename: "internal-pdf-viewer",
+                            length: 1,
+                            name: "Chrome PDF Plugin"
+                        },
+                        {
+                            0: {type: "application/pdf", suffixes: "pdf", description: ""},
+                            description: "",
+                            filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+                            length: 1,
+                            name: "Chrome PDF Viewer"
+                        },
+                        {
+                            0: {type: "application/x-nacl", suffixes: "", description: "Native Client Executable"},
+                            1: {type: "application/x-pnacl", suffixes: "", description: "Portable Native Client Executable"},
+                            description: "",
+                            filename: "internal-nacl-plugin",
+                            length: 2,
+                            name: "Native Client"
+                        }
+                    ]
                 });
                 
+                // 修改 languages
                 Object.defineProperty(navigator, 'languages', {
-                    get: () => ['zh-CN', 'zh', 'en']
+                    get: () => ['zh-CN', 'zh', 'en-US', 'en']
+                });
+                
+                // 修改 permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+                
+                // 伪装 canvas 指纹
+                const getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) {
+                        return 'Intel Inc.';
+                    }
+                    if (parameter === 37446) {
+                        return 'Intel Iris OpenGL Engine';
+                    }
+                    return getParameter.call(this, parameter);
+                };
+                
+                // 添加 connection 属性
+                Object.defineProperty(navigator, 'connection', {
+                    get: () => ({
+                        effectiveType: '4g',
+                        rtt: 50,
+                        downlink: 10,
+                        saveData: false
+                    })
                 });
             """)
             
@@ -189,15 +271,29 @@ class LoginWorker(QThread):
         # 点击登录
         login_frame.locator("button.fm-submit.password-login").click()
         
-        # 等待登录成功
-        try:
-            page.wait_for_url("**/hotel.fliggy.com/ebooking/**", timeout=120000)
-        except Exception as e:
-            raise Exception(f"飞猪登录超时或失败: {str(e)}")
+        # 等待登录成功或需要用户干预（最多120秒）
+        max_wait = 120
+        for i in range(max_wait):
+            page.wait_for_timeout(1000)
+            current_url = page.url
+            
+            # 检查是否登录成功（跳转到后台页面且不在登录页）
+            if "https://hotel.fliggy.com/ebooking/login.htm#/" in current_url and "login" not in current_url:
+                return
+            
+            # 检查是否有错误提示
+            try:
+                error_elem = page.query_selector(".error-message, .login-error, [class*='error']")
+                if error_elem and error_elem.is_visible():
+                    error_text = error_elem.text_content()
+                    if error_text and error_text.strip():
+                        raise Exception(f"飞猪登录失败: {error_text}")
+            except:
+                pass
         
-        # 验证是否真的登录成功
-        if "hotel.fliggy.com/ebooking" not in page.url or "login" in page.url:
-            raise Exception("飞猪登录失败: 未能跳转到后台页面")
+        # 超时后再次检查登录状态
+        if "login" in page.url or "hotel.fliggy.com/ebooking" not in page.url:
+            raise Exception("飞猪登录超时: 请检查账号密码或手动完成验证")
     
     def _login_ctrip(self, page: Page):
         """携程登录"""
