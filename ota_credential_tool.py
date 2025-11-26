@@ -184,12 +184,13 @@ class LoginWorker(QThread):
                 # 最终验证登录状态
                 page.wait_for_timeout(2000)
                 current_url = page.url
+                print(f"最终验证 - 平台: {self.platform}, URL: {current_url}")
                 
                 # 根据平台验证登录状态
                 if self.platform == "美团" and "ebooking" not in current_url:
                     raise Exception("美团登录验证失败: 未在后台页面")
-                elif self.platform == "飞猪" and ("login" in current_url or "ebooking" not in current_url):
-                    raise Exception("飞猪登录验证失败: 未在后台页面")
+                elif self.platform == "飞猪" and "login.htm" in current_url:
+                    raise Exception("飞猪登录验证失败: 仍在登录页面")
                 elif self.platform == "携程" and "login" in current_url:
                     raise Exception("携程登录验证失败: 未在后台页面")
                 
@@ -277,8 +278,14 @@ class LoginWorker(QThread):
             page.wait_for_timeout(1000)
             current_url = page.url
             
+            # 打印当前 URL 用于调试（每10秒打印一次）
+            if i % 10 == 0:
+                print(f"等待登录中... 当前URL: {current_url}")
+            
             # 检查是否登录成功（跳转到后台页面且不在登录页）
-            if "https://hotel.fliggy.com/ebooking/login.htm#/" in current_url and "login" not in current_url:
+            # 只要包含 hotel.fliggy.com 且不包含 login.htm 就认为成功
+            if "hotel.fliggy.com" in current_url and "login.htm" not in current_url:
+                print(f"登录成功！最终URL: {current_url}")
                 return
             
             # 检查是否有错误提示
@@ -292,7 +299,9 @@ class LoginWorker(QThread):
                 pass
         
         # 超时后再次检查登录状态
-        if "login" in page.url or "hotel.fliggy.com/ebooking" not in page.url:
+        current_url = page.url
+        print(f"等待超时，最终URL: {current_url}")
+        if "login.htm" in current_url:
             raise Exception("飞猪登录超时: 请检查账号密码或手动完成验证")
     
     def _login_ctrip(self, page: Page):
