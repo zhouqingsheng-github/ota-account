@@ -275,77 +275,187 @@ class LoginWorker(QThread):
         # 等待登录成功或需要用户干预（最多120秒）
         max_wait = 120
         for i in range(max_wait):
-            page.wait_for_timeout(1000)
-            current_url = page.url
-            
-            # 打印当前 URL 用于调试（每10秒打印一次）
-            if i % 10 == 0:
-                print(f"等待登录中... 当前URL: {current_url}")
-            
-            # 检查是否登录成功（跳转到后台页面且不在登录页）
-            # 只要包含 hotel.fliggy.com 且不包含 login.htm 就认为成功
-            if "hotel.fliggy.com" in current_url and "login.htm" not in current_url:
-                print(f"登录成功！最终URL: {current_url}")
-                return
-            
-            # 检查是否有错误提示
             try:
-                error_elem = page.query_selector(".error-message, .login-error, [class*='error']")
-                if error_elem and error_elem.is_visible():
-                    error_text = error_elem.text_content()
-                    if error_text and error_text.strip():
-                        raise Exception(f"飞猪登录失败: {error_text}")
-            except:
-                pass
+                page.wait_for_timeout(1000)
+                current_url = page.url
+                
+                # 打印当前 URL 用于调试（每10秒打印一次）
+                if i % 10 == 0:
+                    print(f"等待登录中... 当前URL: {current_url}")
+                
+                # 检查是否登录成功（跳转到后台页面且不在登录页）
+                # 只要包含 hotel.fliggy.com 且不包含 login.htm 就认为成功
+                if "hotel.fliggy.com" in current_url and "login.htm" not in current_url:
+                    print(f"登录成功！最终URL: {current_url}")
+                    return
+                
+                # 检查是否有错误提示
+                try:
+                    error_elem = page.query_selector(".error-message, .login-error, [class*='error']")
+                    if error_elem and error_elem.is_visible():
+                        error_text = error_elem.text_content()
+                        if error_text and error_text.strip():
+                            raise Exception(f"飞猪登录失败: {error_text}")
+                except:
+                    pass
+            except Error as e:
+                # 检测到浏览器或页面已关闭
+                if "closed" in str(e).lower() or "target" in str(e).lower():
+                    raise Exception("飞猪登录已取消: 浏览器已关闭")
+                raise
         
         # 超时后再次检查登录状态
-        current_url = page.url
-        print(f"等待超时，最终URL: {current_url}")
-        if "login.htm" in current_url:
-            raise Exception("飞猪登录超时: 请检查账号密码或手动完成验证")
+        try:
+            current_url = page.url
+            print(f"等待超时，最终URL: {current_url}")
+            if "login.htm" in current_url:
+                raise Exception("飞猪登录超时: 请检查账号密码或手动完成验证")
+        except Error:
+            raise Exception("飞猪登录已取消: 浏览器已关闭")
     
     def _login_ctrip(self, page: Page):
         """携程登录"""
         # 访问登录页面
-        page.goto("https://ebooking.ctrip.com/login/index")
-        page.wait_for_load_state("networkidle")
+        page.goto("https://ebooking.ctrip.com/login/index", wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)  # 给页面更多加载时间
+        
+        print(f"携程登录 - 当前URL: {page.url}")
         
         # 检查是否已登录
         if "login" not in page.url:
+            print("携程已登录，跳过登录流程")
             return
         
-        # 等待登录表单
-        page.wait_for_selector("input[name='username-input']", timeout=10000)
+        # 尝试多个可能的选择器
+        username_selectors = [
+            "input[name='username-input']",
+            "input[placeholder*='账号']",
+            "input[placeholder*='用户名']",
+            "input[type='text']",
+            "#username",
+            ".username-input"
+        ]
         
-        # 填写账号密码
-        page.fill("input[name='username-input']", self.username)
-        page.fill("input[name='password-input']", self.password)
+        password_selectors = [
+            "input[name='password-input']",
+            "input[placeholder*='密码']",
+            "input[type='password']",
+            "#password",
+            ".password-input"
+        ]
+        
+        login_button_selectors = [
+            "button#hotel-login-box-button",
+            "button[type='submit']",
+            ".login-button",
+            "button:has-text('登录')",
+            "button:has-text('登 录')"
+        ]
+        
+        # 查找并填写账号
+        username_selector = None
+        for selector in username_selectors:
+            try:
+                elem = page.wait_for_selector(selector, timeout=3000)
+                if elem:
+                    username_selector = selector
+                    print(f"找到账号输入框: {selector}")
+                    break
+            except:
+                continue
+        
+        if not username_selector:
+            # 打印页面内容用于调试
+            print("页面HTML:")
+            print(page.content()[:2000])
+            raise Exception("携程登录失败: 未找到账号输入框")
+        
+        # 查找并填写密码
+        password_selector = None
+        for selector in password_selectors:
+            try:
+                elem = page.wait_for_selector(selector, timeout=3000)
+                if elem:
+                    password_selector = selector
+                    print(f"找到密码输入框: {selector}")
+                    break
+            except:
+                continue
+        
+        if not password_selector:
+            raise Exception("携程登录失败: 未找到密码输入框")
+        
+        # 填写账号密码（模拟人工输入）
+        page.fill(username_selector, "")
+        page.wait_for_timeout(200)
+        for char in self.username:
+            page.type(username_selector, char, delay=100)
         page.wait_for_timeout(500)
         
+        page.fill(password_selector, "")
+        page.wait_for_timeout(200)
+        for char in self.password:
+            page.type(password_selector, char, delay=100)
+        page.wait_for_timeout(500)
+        
+        # 查找并点击登录按钮
+        login_button_selector = None
+        for selector in login_button_selectors:
+            try:
+                elem = page.wait_for_selector(selector, timeout=3000)
+                if elem and elem.is_visible():
+                    login_button_selector = selector
+                    print(f"找到登录按钮: {selector}")
+                    break
+            except:
+                continue
+        
+        if not login_button_selector:
+            raise Exception("携程登录失败: 未找到登录按钮")
+        
         # 点击登录
-        page.click("button#hotel-login-box-button")
+        page.click(login_button_selector)
         page.wait_for_timeout(3000)
         
         # 等待登录结果（最多120秒，给用户时间处理验证码）
         max_wait = 120
         for i in range(max_wait):
-            page.wait_for_timeout(1000)
-            current_url = page.url
-            
-            # 检查是否登录成功
-            if "login" not in current_url and "ebooking.ctrip.com" in current_url:
-                return
-            
-            # 检查是否有错误提示
-            error_elem = page.query_selector(".error-message, .login-error, [class*='error']")
-            if error_elem and error_elem.is_visible():
-                error_text = error_elem.text_content()
-                if error_text and error_text.strip():
-                    raise Exception(f"携程登录失败: {error_text}")
+            try:
+                page.wait_for_timeout(1000)
+                current_url = page.url
+                
+                # 打印当前 URL 用于调试（每10秒打印一次）
+                if i % 10 == 0:
+                    print(f"等待携程登录中... 当前URL: {current_url}")
+                
+                # 检查是否登录成功
+                if "login" not in current_url and "ebooking.ctrip.com" in current_url:
+                    print(f"携程登录成功！最终URL: {current_url}")
+                    return
+                
+                # 检查是否有错误提示
+                try:
+                    error_elem = page.query_selector(".error-message, .login-error, [class*='error'], .tip-error")
+                    if error_elem and error_elem.is_visible():
+                        error_text = error_elem.text_content()
+                        if error_text and error_text.strip():
+                            raise Exception(f"携程登录失败: {error_text}")
+                except:
+                    pass
+            except Error as e:
+                # 检测到浏览器或页面已关闭
+                if "closed" in str(e).lower() or "target" in str(e).lower():
+                    raise Exception("携程登录已取消: 浏览器已关闭")
+                raise
         
         # 超时后再次检查
-        if "login" in page.url:
-            raise Exception("携程登录超时: 请检查账号密码或手动完成验证")
+        try:
+            current_url = page.url
+            print(f"等待超时，最终URL: {current_url}")
+            if "login" in current_url:
+                raise Exception("携程登录超时: 请检查账号密码或手动完成验证")
+        except Error:
+            raise Exception("携程登录已取消: 浏览器已关闭")
     
     def _check_login_error(self, page: Page, frame=None) -> str:
         """检查登录错误信息"""
