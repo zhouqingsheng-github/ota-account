@@ -61,7 +61,8 @@ class LoginWorker(QThread):
                         '--no-sandbox',
                         '--disable-web-security',
                         '--disable-features=IsolateOrigins,site-per-process',
-                        '--disable-site-isolation-trials'
+                        '--disable-site-isolation-trials',
+                        '--start-maximized'  # 启动时最大化窗口
                     ]
                 )
             except Exception:
@@ -74,20 +75,21 @@ class LoginWorker(QThread):
                         '--no-sandbox',
                         '--disable-web-security',
                         '--disable-features=IsolateOrigins,site-per-process',
-                        '--disable-site-isolation-trials'
+                        '--disable-site-isolation-trials',
+                        '--start-maximized'  # 启动时最大化窗口
                     ]
                 )
             
             # 创建上下文，模拟真实浏览器
+            # 不设置固定的 viewport，让浏览器使用实际窗口大小
             context = browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
+                no_viewport=True,  # 不限制 viewport，使用实际窗口大小
                 user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 locale='zh-CN',
                 timezone_id='Asia/Shanghai',
                 permissions=['geolocation'],
                 has_touch=False,
-                is_mobile=False,
-                device_scale_factor=1
+                is_mobile=False
             )
             
             page = context.new_page()
