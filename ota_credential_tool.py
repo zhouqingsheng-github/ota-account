@@ -11,6 +11,7 @@ import subprocess
 import os
 from typing import Optional
 from pathlib import Path
+import platform
 
 # 设置 Playwright 浏览器路径（用于打包后的程序）
 if getattr(sys, 'frozen', False):
@@ -705,7 +706,10 @@ class OTACredentialTool(QMainWindow):
                 color: #999;
             }
         """)
+        # 使用更强的事件连接方式,提高 Windows 兼容性
         self.get_credential_btn.clicked.connect(self.get_credential)
+        # 添加额外的事件处理,确保在 Windows 上能响应
+        self.get_credential_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         layout.addWidget(self.get_credential_btn)
         
         # 凭证显示区域
@@ -756,7 +760,10 @@ class OTACredentialTool(QMainWindow):
                 color: #999;
             }
         """)
+        # 使用更强的事件连接方式,提高 Windows 兼容性
         self.copy_btn.clicked.connect(self.copy_credential)
+        # 添加额外的事件处理,确保在 Windows 上能响应
+        self.copy_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         layout.addWidget(self.copy_btn)
         
         # 版本信息
@@ -800,12 +807,15 @@ class OTACredentialTool(QMainWindow):
             "text-decoration: underline;"
         )
         self.browser_path_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        # 绑定鼠标点击事件
+        self.browser_path_label.mousePressEvent = self.on_browser_label_clicked
         self.browser_installed = False
     
     def on_browser_label_clicked(self, event):
         """点击浏览器标签时的处理"""
         if not self.browser_installed:
             self.show_browser_missing_error()
+            event.accept()  # 明确接受事件,防止事件传播
     
 
     
@@ -901,7 +911,20 @@ class OTACredentialTool(QMainWindow):
 
 def main():
     """主函数"""
+    # Windows 系统特定设置
+    if platform.system() == 'Windows':
+        try:
+            # 启用 DPI 感知,修复高 DPI 屏幕上的点击偏移问题
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+        except Exception as e:
+            print(f"设置 DPI 感知失败: {e}")
+    
     app = QApplication(sys.argv)
+    
+    # 设置应用程序属性,提高 Windows 兼容性
+    app.setStyle('Fusion')  # 使用 Fusion 风格,在所有平台上表现一致
+    
     window = OTACredentialTool()
     window.show()
     sys.exit(app.exec())
